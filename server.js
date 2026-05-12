@@ -12,6 +12,11 @@ app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Serve static files (index.html)
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // Storage configuration
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -46,6 +51,10 @@ function saveData() {
 }
 
 // API Endpoints
+
+app.get('/api', (req, res) => {
+    res.json({ status: 'ok', message: 'simpleShare API is running' });
+});
 
 // Files
 app.get('/api/files', (req, res) => {

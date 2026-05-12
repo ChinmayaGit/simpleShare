@@ -127,6 +127,9 @@
             Simple Share
         </div>
         <div class="flex items-center gap-4">
+            <button onclick="logout()" class="text-xs font-bold text-gray-500 hover:text-rose-500 transition-colors flex items-center gap-1">
+                <i class="fa-solid fa-right-from-bracket"></i> Logout
+            </button>
             <button id="theme-toggle" class="w-10 h-10 rounded-full flex items-center justify-center bg-white dark:bg-slate-800 shadow-sm border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-yellow-400 hover:scale-110 transition-all">
                 <i id="theme-icon" class="fa-solid fa-moon"></i>
             </button>
@@ -358,7 +361,11 @@
         function checkAuth() {
             const isAuth = localStorage.getItem('simpleShare_authenticated') === 'true';
             if (isAuth) {
-                showApp();
+                // Instantly show app for autologin
+                mainApp.classList.remove('hidden');
+                mainApp.style.opacity = '1';
+                applyRoleRestrictions();
+                initAppData();
             } else {
                 authView.classList.remove('hidden');
                 authView.classList.add('flex');
@@ -375,6 +382,12 @@
                 applyRoleRestrictions();
                 initAppData();
             }, 500);
+        }
+
+        function logout() {
+            localStorage.removeItem('simpleShare_authenticated');
+            localStorage.removeItem('simpleShare_role');
+            location.reload();
         }
 
         function applyRoleRestrictions() {

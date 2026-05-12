@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>simpleShare | Persistent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        .glass {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .dark .glass {
+            background: rgba(30, 41, 59, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .drag-active {
+            border-color: #3b82f6;
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        .dark .drag-active {
+            background-color: rgba(59, 130, 246, 0.05);
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        
+        /* New Styles for Refactor */
+        .category-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .category-card:hover {
+            transform: translateY(-5px);
+        }
+        .snap-container {
+            scroll-snap-type: y mandatory;
+            overflow-y: scroll;
+            height: 100vh;
+            scrollbar-width: none;
+        }
+        .snap-container::-webkit-scrollbar {
+            display: none;
+        }
+        .snap-item {
+            scroll-snap-align: center;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .list-view-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            width: 100%;
+        }
+        
+        /* Loading Overlay */
+        #init-loader {
+            position: fixed; inset: 0; z-index: 100;
+            background: white; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; transition: opacity 0.5s;
+        }
+        .dark #init-loader { background: #0f172a; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-slate-900 dark:to-indigo-950 min-h-screen font-sans text-gray-800 dark:text-gray-200 transition-colors duration-300 pb-10">
+    
+    <!-- Init Loader -->
+    <div id="init-loader">
+        <div class="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+        <p class="font-bold text-indigo-600 dark:text-indigo-400">Loading simpleShare...</p>
+    </div>
+
+    <!-- Navbar -->
+    <nav class="glass sticky top-0 z-50 px-6 py-4 flex justify-between items-center shadow-sm">
+        <div class="text-2xl font-bold text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
+            <i class="fa-solid fa-share-nodes"></i>
+            Simple Share
+        </div>
+        <div class="flex items-center gap-4">
+            <button id="theme-toggle" class="w-10 h-10 rounded-full flex items-center justify-center bg-white dark:bg-slate-800 shadow-sm border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-yellow-400 hover:scale-110 transition-all">
+                <i id="theme-icon" class="fa-solid fa-moon"></i>
+            </button>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-8 grid grid-cols-1 xl:grid-cols-12 gap-8">
+        
+        <!-- Left Sidebar: Categories & Monitor -->
+        <aside class="xl:col-span-3 flex flex-col gap-6">
+            <!-- System Monitor -->
+            <div class="glass rounded-2xl p-5 shadow-sm border border-indigo-100 dark:border-slate-800">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+                        <i class="fa-solid fa-gauge-high text-indigo-500"></i> System Monitor
+                    </h3>
+                    <span class="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-[10px] text-emerald-600 font-bold">LIVE</span>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-500">CPU Usage</span>
+                            <span id="cpu-val" class="font-bold text-indigo-600">--%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-1.5">
+                            <div id="cpu-bar" class="bg-indigo-500 h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-500">RAM Usage</span>
+                            <span id="ram-val" class="font-bold text-emerald-600">-- GB</span>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-1.5">
+                            <div id="ram-bar" class="bg-emerald-500 h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-500">IndexedDB Storage</span>
+                            <span id="storage-val" class="font-bold text-amber-600">0 MB</span>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-1.5">
+                            <div id="storage-bar" class="bg-amber-500 h-1.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categories -->
+            <div class="glass rounded-2xl p-4 flex flex-col gap-1 shadow-sm">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-3">Navigation</h3>
+                <button onclick="showLanding()" id="cat-home" class="category-btn w-full text-left px-4 py-2.5 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-medium transition-colors flex items-center gap-3">
+                    <i class="fa-solid fa-house w-5"></i> Home
+                </button>
+                <div class="h-px bg-gray-100 dark:bg-slate-800 my-2 mx-3"></div>
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-3">Categories</h3>
+                <button onclick="filterCategory('video')" id="cat-video" class="category-btn w-full text-left px-4 py-2.5 rounded-xl hover:bg-indigo-50 dark:hover:bg-slate-800/50 text-gray-600 dark:text-gray-400 font-medium transition-colors flex items-center gap-3">
+                    <i class="fa-solid fa-video w-5"></i> Videos
+                </button>
+                <button onclick="filterCategory('audio')" id="cat-audio" class="category-btn w-full text-left px-4 py-2.5 rounded-xl hover:bg-indigo-50 dark:hover:bg-slate-800/50 text-gray-600 dark:text-gray-400 font-medium transition-colors flex items-center gap-3">
+                    <i class="fa-solid fa-music w-5"></i> Audio & Songs
+                </button>
+                <button onclick="filterCategory('image')" id="cat-image" class="category-btn w-full text-left px-4 py-2.5 rounded-xl hover:bg-indigo-50 dark:hover:bg-slate-800/50 text-gray-600 dark:text-gray-400 font-medium transition-colors flex items-center gap-3">
+                    <i class="fa-solid fa-image w-5"></i> Images
+                </button>
+                <button onclick="filterCategory('document')" id="cat-document" class="category-btn w-full text-left px-4 py-2.5 rounded-xl hover:bg-indigo-50 dark:hover:bg-slate-800/50 text-gray-600 dark:text-gray-400 font-medium transition-colors flex items-center gap-3">
+                    <i class="fa-solid fa-file-lines w-5"></i> Documents
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="xl:col-span-6 flex flex-col gap-6">
+            <!-- Landing View (Category Grid) -->
+            <div id="landing-view" class="flex flex-col gap-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <div onclick="filterCategory('video')" class="category-card glass rounded-2xl p-6 cursor-pointer flex flex-col items-center gap-4 hover:shadow-lg border-2 border-transparent hover:border-rose-400 transition-all">
+                        <div class="w-16 h-16 rounded-2xl bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-3xl text-rose-600 dark:text-rose-400">
+                            <i class="fa-solid fa-video"></i>
+                        </div>
+                        <div class="text-center">
+                            <h3 class="font-bold text-lg dark:text-white">Videos</h3>
+                            <p class="text-xs text-gray-500" id="count-video">0 items</p>
+                        </div>
+                    </div>
+                    <div onclick="filterCategory('image')" class="category-card glass rounded-2xl p-6 cursor-pointer flex flex-col items-center gap-4 hover:shadow-lg border-2 border-transparent hover:border-emerald-400 transition-all">
+                        <div class="w-16 h-16 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-3xl text-emerald-600 dark:text-emerald-400">
+                            <i class="fa-solid fa-image"></i>
+                        </div>
+                        <div class="text-center">
+                            <h3 class="font-bold text-lg dark:text-white">Images</h3>
+                            <p class="text-xs text-gray-500" id="count-image">0 items</p>
+                        </div>
+                    </div>
+                    <div onclick="filterCategory('audio')" class="category-card glass rounded-2xl p-6 cursor-pointer flex flex-col items-center gap-4 hover:shadow-lg border-2 border-transparent hover:border-violet-400 transition-all">
+                        <div class="w-16 h-16 rounded-2xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center text-3xl text-violet-600 dark:text-violet-400">
+                            <i class="fa-solid fa-music"></i>
+                        </div>
+                        <div class="text-center">
+                            <h3 class="font-bold text-lg dark:text-white">Audio</h3>
+                            <p class="text-xs text-gray-500" id="count-audio">0 items</p>
+                        </div>
+                    </div>
+                    <div onclick="filterCategory('document')" class="category-card glass rounded-2xl p-6 cursor-pointer flex flex-col items-center gap-4 hover:shadow-lg border-2 border-transparent hover:border-indigo-400 transition-all">
+                        <div class="w-16 h-16 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-3xl text-indigo-600 dark:text-indigo-400">
+                            <i class="fa-solid fa-file-lines"></i>
+                        </div>
+                        <div class="text-center">
+                            <h3 class="font-bold text-lg dark:text-white">Documents</h3>
+                            <p class="text-xs text-gray-500" id="count-document">0 items</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Files Section -->
+                <div class="mt-4">
+                    <h3 class="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 px-1">Recently Uploaded</h3>
+                    <div id="recent-files-list" class="space-y-3">
+                        <!-- Recent files -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Category View (File List/Grid) -->
+            <div id="category-view" class="hidden flex flex-col gap-6">
+                <!-- Navigation & Controls -->
+                <div class="flex flex-col gap-4">
+                    <div class="flex items-center gap-3">
+                        <button onclick="showLanding()" class="w-10 h-10 rounded-xl glass flex items-center justify-center text-indigo-600 dark:text-indigo-400 hover:scale-105 transition-all">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <h2 class="text-xl font-bold text-gray-800 dark:text-white" id="current-category-title">Videos</h2>
+                    </div>
+                    
+                    <div class="flex items-center justify-between glass rounded-xl p-2 px-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-gray-400 uppercase tracking-tighter mr-2">Sort By</span>
+                            <select id="sort-select" onchange="handleSort()" class="bg-transparent text-sm font-medium focus:outline-none dark:text-gray-300 cursor-pointer">
+                                <option value="date-desc">Newest First</option>
+                                <option value="date-asc">Oldest First</option>
+                                <option value="name-asc">Name (A-Z)</option>
+                                <option value="name-desc">Name (Z-A)</option>
+                                <option value="size-desc">Largest First</option>
+                                <option value="size-asc">Smallest First</option>
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-1 bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
+                            <button id="view-grid" onclick="setLayout('grid')" class="w-8 h-8 rounded flex items-center justify-center text-gray-400 transition-all">
+                                <i class="fa-solid fa-grip"></i>
+                            </button>
+                            <button id="view-list" onclick="setLayout('list')" class="w-8 h-8 rounded flex items-center justify-center text-gray-400 transition-all">
+                                <i class="fa-solid fa-list"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Files Display -->
+                <div id="files-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- File items -->
+                </div>
+                
+                <!-- Empty State -->
+                <div id="empty-state" class="glass rounded-2xl p-12 flex flex-col items-center justify-center text-center">
+                    <i class="fa-regular fa-folder-open text-4xl text-gray-300 dark:text-gray-700 mb-3"></i>
+                    <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400">No files found</h3>
+                    <p class="text-[10px] text-gray-400 mt-1">Upload files to this category to see them here</p>
+                </div>
+            </div>
+
+            <!-- Upload Area -->
+            <div id="drop-zone" class="glass border-2 border-dashed border-gray-300 dark:border-slate-700 rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-50/30">
+                <div class="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center text-xl mb-3 shadow-sm">
+                    <i class="fa-solid fa-plus"></i>
+                </div>
+                <h2 class="text-lg font-bold dark:text-white">Upload to Database</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Files are saved permanently in your browser</p>
+                <input type="file" id="file-input" class="hidden" multiple>
+                <button onclick="document.getElementById('file-input').click()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-all shadow-md shadow-indigo-200 dark:shadow-none">
+                    Choose Files
+                </button>
+            </div>
+
+            <!-- Upload Progress -->
+            <div id="upload-progress-container" class="glass rounded-2xl p-4 hidden flex-col gap-3 shadow-sm border border-indigo-100 dark:border-slate-800">
+                <div class="flex justify-between items-center text-xs font-medium">
+                    <span id="upload-filename" class="text-gray-700 dark:text-gray-300 truncate max-w-[70%]">Saving to IndexedDB...</span>
+                    <span id="upload-percentage" class="text-indigo-600 font-bold">0%</span>
+                </div>
+                <div class="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                    <div id="upload-bar" class="bg-indigo-500 h-2 rounded-full transition-all duration-200" style="width: 0%"></div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Sidebar: Notes & Reminders -->
+        <aside class="xl:col-span-3 flex flex-col gap-6">
+            <!-- Notes Section -->
+            <div class="glass rounded-2xl p-5 shadow-sm border border-indigo-100 dark:border-slate-800 flex flex-col h-[400px]">
+                <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 flex items-center justify-between">
+                    <span><i class="fa-solid fa-note-sticky text-amber-500 mr-2"></i> Quick Notes</span>
+                    <button onclick="addNote()" class="text-indigo-500 hover:scale-110 transition-transform"><i class="fa-solid fa-circle-plus"></i></button>
+                </h3>
+                <div id="notes-list" class="flex-grow overflow-y-auto space-y-3 pr-1">
+                    <!-- Notes -->
+                </div>
+            </div>
+
+            <!-- Reminders Section -->
+            <div class="glass rounded-2xl p-5 shadow-sm border border-indigo-100 dark:border-slate-800">
+                <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 flex items-center justify-between">
+                    <span><i class="fa-solid fa-bell text-rose-500 mr-2"></i> Reminders</span>
+                    <button onclick="addReminder()" class="text-rose-500 hover:scale-110 transition-transform"><i class="fa-solid fa-plus-circle"></i></button>
+                </h3>
+                <div id="reminders-list" class="space-y-2 max-h-[250px] overflow-y-auto pr-1">
+                    <!-- Reminders -->
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Viewer Modals -->
+    <div id="viewer-modal" class="fixed inset-0 z-[60] bg-black/90 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="relative w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <button onclick="closeViewer()" class="absolute -top-12 right-0 text-white text-3xl hover:text-gray-300 transition-colors">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div id="viewer-content" class="bg-white dark:bg-slate-900 rounded-2xl overflow-hidden flex items-center justify-center min-h-[300px] shadow-2xl">
+                <!-- Media content -->
+            </div>
+            <div id="viewer-footer" class="mt-4 text-center text-white font-medium truncate px-4"></div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * BACKEND INTEGRATION LOGIC
+         */
+        const API_BASE = '/api'; // Behind Nginx reverse proxy
+
+        async function apiFetch(endpoint, options = {}) {
+            try {
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+                return await response.json();
+            } catch (err) {
+                console.error(`Fetch error for ${endpoint}:`, err);
+                throw err;
+            }
+        }
+
+        async function getAllFilesFromServer() {
+            return await apiFetch('/files');
+        }
+
+        async function uploadFileToServer(file, onProgress) {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', `${API_BASE}/upload`, true);
+
+                xhr.upload.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        onProgress(percentComplete);
+                    }
+                };
+
+                xhr.onload = () => {
+                    if (xhr.status === 200) {
+                        resolve(JSON.parse(xhr.responseText));
+                    } else {
+                        reject(new Error('Upload failed'));
+                    }
+                };
+
+                xhr.onerror = () => reject(new Error('Upload failed'));
+                xhr.send(formData);
+            });
+        }
+
+        async function deleteFileFromServer(id) {
+            return await apiFetch(`/delete/${id}`, { method: 'DELETE' });
+        }
+
+        // State
+        let files = [];
+        let notes = [];
+        let reminders = [];
+        let currentCategory = 'all';
+        let layoutMode = 'grid'; // 'grid' or 'list'
+        let currentSort = 'date-desc';
+
+        // Elements
+        const themeToggle = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-icon');
+        const html = document.documentElement;
+        const filesGrid = document.getElementById('files-grid');
+        const emptyState = document.getElementById('empty-state');
+        const notesList = document.getElementById('notes-list');
+        const remindersList = document.getElementById('reminders-list');
+        const viewerModal = document.getElementById('viewer-modal');
+        const viewerContent = document.getElementById('viewer-content');
+        const viewerFooter = document.getElementById('viewer-footer');
+        const loader = document.getElementById('init-loader');
+        
+        const landingView = document.getElementById('landing-view');
+        const categoryView = document.getElementById('category-view');
+
+        // Theme
+        if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            html.classList.add('dark');
+            themeIcon.classList.replace('fa-moon', 'fa-sun');
+        }
+        themeToggle.addEventListener('click', () => {
+            html.classList.toggle('dark');
+            const isDark = html.classList.contains('dark');
+            localStorage.theme = isDark ? 'dark' : 'light';
+            themeIcon.classList.replace(isDark ? 'fa-moon' : 'fa-sun', isDark ? 'fa-sun' : 'fa-moon');
+        });
+
+        // Startup
+        window.addEventListener('load', async () => {
+            try {
+                // Fetch initial data from server
+                [files, notes, reminders] = await Promise.all([
+                    apiFetch('/files'),
+                    apiFetch('/notes'),
+                    apiFetch('/reminders')
+                ]);
+
+                updateCategoryCounts();
+                renderRecentFiles();
+                renderNotes(false);
+                renderReminders(false);
+                
+                // Hide loader
+                loader.style.opacity = '0';
+                setTimeout(() => loader.remove(), 500);
+            } catch (err) {
+                console.error("Failed to fetch initial data", err);
+                loader.style.opacity = '0';
+                setTimeout(() => loader.remove(), 500);
+                alert("Could not connect to the server.");
+            }
+        });
+
+        // Navigation
+        function showLanding() {
+            landingView.classList.remove('hidden');
+            categoryView.classList.add('hidden');
+            currentCategory = 'all';
+            
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.classList.remove('bg-indigo-100', 'text-indigo-700', 'dark:bg-indigo-900/50', 'dark:text-indigo-300');
+                btn.classList.add('hover:bg-indigo-50', 'text-gray-600', 'dark:hover:bg-slate-800/50', 'dark:text-gray-400');
+            });
+            document.getElementById('cat-home').classList.add('bg-indigo-100', 'text-indigo-700', 'dark:bg-indigo-900/50', 'dark:text-indigo-300');
+            
+            updateCategoryCounts();
+            renderRecentFiles();
+        }
+
+        function filterCategory(cat) {
+            currentCategory = cat;
+            landingView.classList.add('hidden');
+            categoryView.classList.remove('hidden');
+
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.classList.remove('bg-indigo-100', 'text-indigo-700', 'dark:bg-indigo-900/50', 'dark:text-indigo-300');
+                btn.classList.add('hover:bg-indigo-50', 'text-gray-600', 'dark:hover:bg-slate-800/50', 'dark:text-gray-400');
+            });
+            const active = document.getElementById('cat-' + cat);
+            if (active) active.classList.add('bg-indigo-100', 'text-indigo-700', 'dark:bg-indigo-900/50', 'dark:text-indigo-300');
+            
+            const titles = { video: 'Videos', audio: 'Audio & Songs', image: 'Images', document: 'Documents' };
+            document.getElementById('current-category-title').textContent = titles[cat];
+            renderFiles();
+        }
+
+        function updateCategoryCounts() {
+            const counts = { video: 0, image: 0, audio: 0, document: 0 };
+            files.forEach(f => { if(counts[f.type] !== undefined) counts[f.type]++; });
+            
+            for (const [type, count] of Object.entries(counts)) {
+                const el = document.getElementById(`count-${type}`);
+                if (el) el.textContent = `${count} item${count !== 1 ? 's' : ''}`;
+            }
+        }
+
+        function renderRecentFiles() {
+            const list = document.getElementById('recent-files-list');
+            list.innerHTML = '';
+            const recent = files.slice(0, 5);
+            
+            if (recent.length === 0) {
+                list.innerHTML = '<p class="text-center py-4 text-gray-400 text-sm italic">No files uploaded yet</p>';
+                return;
+            }
+
+            recent.forEach(file => {
+                const item = document.createElement('div');
+                item.className = 'glass rounded-xl p-3 flex gap-4 items-center hover:bg-white/60 dark:hover:bg-slate-800/60 transition-all cursor-pointer';
+                item.onclick = () => openViewer(file);
+                
+                const iconClass = getIconClass(file.type);
+                const colorClass = getColorClass(file.type);
+                
+                item.innerHTML = `
+                    <div class="w-10 h-10 rounded-lg flex items-center justify-center text-lg ${colorClass.bg} ${colorClass.text}">
+                        <i class="fa-solid ${iconClass}"></i>
+                    </div>
+                    <div class="flex-grow min-w-0">
+                        <h4 class="text-xs font-bold truncate dark:text-gray-100">${file.name}</h4>
+                        <p class="text-[10px] text-gray-500">${file.size} • ${file.date}</p>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        // View Controls
+        function setLayout(mode) {
+            layoutMode = mode;
+            document.getElementById('view-grid').classList.toggle('bg-white', mode === 'grid');
+            document.getElementById('view-grid').classList.toggle('dark:bg-slate-700', mode === 'grid');
+            document.getElementById('view-grid').classList.toggle('text-indigo-600', mode === 'grid');
+            document.getElementById('view-list').classList.toggle('bg-white', mode === 'list');
+            document.getElementById('view-list').classList.toggle('dark:bg-slate-700', mode === 'list');
+            document.getElementById('view-list').classList.toggle('text-indigo-600', mode === 'list');
+            renderFiles();
+        }
+
+        function handleSort() {
+            currentSort = document.getElementById('sort-select').value;
+            renderFiles();
+        }
+
+        // System Monitor Simulation
+        function updateMonitor() {
+            const cpu = Math.floor(Math.random() * 25) + 3;
+            const ram = (Math.random() * 0.8 + 0.4).toFixed(1);
+            const ramPercent = (ram / 4 * 100).toFixed(0);
+            
+            document.getElementById('cpu-val').textContent = cpu + '%';
+            document.getElementById('cpu-bar').style.width = cpu + '%';
+            
+            document.getElementById('ram-val').textContent = ram + ' GB';
+            document.getElementById('ram-bar').style.width = ramPercent + '%';
+            
+            // Storage based on server data
+            const bytesUsed = files.reduce((acc, f) => acc + (f.sizeBytes || 0), 0);
+            const mbUsed = (bytesUsed / 1048576).toFixed(1);
+            const storagePercent = Math.min(100, (bytesUsed / (10 * 1073741824) * 100)).toFixed(1); // 10GB limit visual
+            
+            document.getElementById('storage-val').textContent = mbUsed + ' MB';
+            document.getElementById('storage-bar').style.width = Math.max(2, storagePercent) + '%';
+        }
+        setInterval(updateMonitor, 3000);
+        updateMonitor();
+
+        // Files Handling
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-active'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-active'));
+        dropZone.addEventListener('drop', (e) => { e.preventDefault(); dropZone.classList.remove('drag-active'); handleFiles(e.dataTransfer.files); });
+        fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
+
+        function handleFiles(newFiles) {
+            if (newFiles.length === 0) return;
+            uploadQueue(Array.from(newFiles));
+        }
+
+        async function uploadQueue(fileList) {
+            const container = document.getElementById('upload-progress-container');
+            const filename = document.getElementById('upload-filename');
+            const bar = document.getElementById('upload-bar');
+            const perc = document.getElementById('upload-percentage');
+
+            if (fileList.length === 0) {
+                container.classList.add('hidden');
+                if (currentCategory === 'all') {
+                    renderRecentFiles();
+                    updateCategoryCounts();
+                } else {
+                    renderFiles();
+                }
+                updateMonitor();
+                return;
+            }
+
+            const file = fileList.shift();
+            container.classList.remove('hidden');
+            filename.textContent = `Uploading ${file.name}...`;
+            
+            try {
+                const uploadedFile = await uploadFileToServer(file, (p) => {
+                    bar.style.width = p + '%';
+                    perc.textContent = Math.round(p) + '%';
+                });
+                files.unshift(uploadedFile);
+                uploadQueue(fileList);
+            } catch (err) {
+                alert(`Failed to upload ${file.name}`);
+                uploadQueue(fileList);
+            }
+        }
+
+        function renderFiles() {
+            filesGrid.innerHTML = '';
+            let filtered = currentCategory === 'all' ? files : files.filter(f => f.type === currentCategory);
+            
+            // Apply Sorting
+            const [field, order] = currentSort.split('-');
+            filtered.sort((a, b) => {
+                let valA, valB;
+                if (field === 'date') {
+                    valA = new Date(a.date);
+                    valB = new Date(b.date);
+                } else if (field === 'size') {
+                    valA = a.sizeBytes;
+                    valB = b.sizeBytes;
+                } else {
+                    valA = a.name.toLowerCase();
+                    valB = b.name.toLowerCase();
+                }
+                
+                if (order === 'asc') return valA > valB ? 1 : -1;
+                return valA < valB ? 1 : -1;
+            });
+
+            if (filtered.length === 0) {
+                emptyState.classList.remove('hidden');
+                filesGrid.classList.add('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+            filesGrid.classList.remove('hidden');
+
+            if (layoutMode === 'grid') {
+                filesGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-4';
+            } else {
+                filesGrid.className = 'flex flex-col gap-2';
+            }
+
+            filtered.forEach(file => {
+                const card = document.createElement('div');
+                if (layoutMode === 'grid') {
+                    card.className = 'glass rounded-xl p-3 flex gap-4 items-center group relative hover:shadow-md transition-all cursor-pointer border border-transparent hover:border-indigo-200 dark:hover:border-slate-700 bg-white/40 dark:bg-slate-800/40';
+                    card.onclick = () => openViewer(file);
+                    
+                    const iconClass = getIconClass(file.type);
+                    const colorClass = getColorClass(file.type);
+                    
+                    card.innerHTML = `
+                        <div class="w-12 h-12 rounded-lg flex items-center justify-center text-xl ${colorClass.bg} ${colorClass.text} shadow-sm">
+                            <i class="fa-solid ${iconClass}"></i>
+                        </div>
+                        <div class="flex-grow min-w-0">
+                            <h4 class="text-sm font-bold truncate dark:text-gray-100" title="${file.name}">${file.name}</h4>
+                            <p class="text-[10px] text-gray-500 font-medium">${file.size} • ${file.date}</p>
+                        </div>
+                        <button onclick="event.stopPropagation(); deleteFile('${file.id}')" class="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-rose-500 transition-all rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/20">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    `;
+                } else {
+                    card.className = 'glass rounded-lg p-2 px-4 flex items-center gap-4 group hover:bg-white/60 dark:hover:bg-slate-800/60 transition-all cursor-pointer';
+                    card.onclick = () => openViewer(file);
+                    const iconClass = getIconClass(file.type);
+                    const colorClass = getColorClass(file.type);
+                    card.innerHTML = `
+                        <i class="fa-solid ${iconClass} ${colorClass.text} w-5"></i>
+                        <h4 class="text-sm font-medium truncate flex-grow dark:text-gray-200">${file.name}</h4>
+                        <span class="text-[10px] text-gray-400 font-medium w-24 text-right">${file.date}</span>
+                        <span class="text-[10px] text-gray-400 font-medium w-16 text-right">${file.size}</span>
+                        <button onclick="event.stopPropagation(); deleteFile('${file.id}')" class="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-rose-500 transition-all ml-2">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    `;
+                }
+                filesGrid.appendChild(card);
+            });
+        }
+
+        async function deleteFile(id) {
+            if(!confirm("Delete this file permanently?")) return;
+            try {
+                await deleteFileFromServer(id);
+                files = files.filter(f => f.id !== id);
+                if (categoryView.classList.contains('hidden')) {
+                    renderRecentFiles();
+                    updateCategoryCounts();
+                } else {
+                    renderFiles();
+                }
+                updateMonitor();
+            } catch (err) {
+                alert("Failed to delete file.");
+            }
+        }
+
+        // Immersive Viewer Logic
+        function openViewer(selectedFile) {
+            viewerModal.innerHTML = `
+                <div class="fixed inset-0 z-[70] bg-black/95 overflow-hidden">
+                    <button onclick="closeViewer()" class="fixed top-6 right-6 z-[80] text-white/50 hover:text-white text-4xl transition-all hover:scale-110">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                    
+                    <div id="immersive-scroller" class="snap-container h-screen w-full">
+                        <!-- Media items will be injected here -->
+                    </div>
+                </div>
+            `;
+            viewerModal.classList.remove('hidden');
+            
+            const scroller = document.getElementById('immersive-scroller');
+            
+            // Get all files of the same type (or all if coming from recent)
+            const type = selectedFile.type;
+            const playlist = files.filter(f => f.type === type);
+            
+            playlist.forEach(file => {
+                const item = document.createElement('div');
+                item.className = 'snap-item w-full relative';
+                item.id = `view-${file.id}`;
+                
+                let content = '';
+                if (file.type === 'video') {
+                    content = `<video src="${file.url}" class="max-h-full max-w-full" loop playsinline controls></video>`;
+                } else if (file.type === 'image') {
+                    content = `<img src="${file.url}" class="max-h-full max-w-full object-contain">`;
+                } else if (file.type === 'audio') {
+                    content = `
+                        <div class="flex flex-col items-center gap-8 p-10 text-center">
+                            <div class="w-48 h-48 rounded-full bg-indigo-500/10 flex items-center justify-center text-8xl text-indigo-500 shadow-2xl shadow-indigo-500/20">
+                                <i class="fa-solid fa-music"></i>
+                            </div>
+                            <div>
+                                <h2 class="text-2xl font-bold text-white mb-2">${file.name}</h2>
+                                <p class="text-indigo-400 font-medium">${file.size} • ${file.date}</p>
+                            </div>
+                            <audio src="${file.url}" controls class="w-80"></audio>
+                        </div>`;
+                } else {
+                    content = `
+                        <div class="flex flex-col items-center gap-6 text-center text-white p-10">
+                            <i class="fa-solid fa-file-lines text-8xl text-gray-600"></i>
+                            <h2 class="text-xl font-bold">${file.name}</h2>
+                            <a href="${file.url}" download class="bg-indigo-600 px-8 py-3 rounded-full font-bold hover:bg-indigo-700 transition-all flex items-center gap-3">
+                                <i class="fa-solid fa-download"></i> Download to View
+                            </a>
+                        </div>`;
+                }
+                
+                item.innerHTML = `
+                    ${content}
+                    <div class="absolute bottom-10 left-10 right-10 flex justify-between items-end pointer-events-none">
+                        <div class="max-w-[70%]">
+                            <h3 class="text-white font-bold text-lg drop-shadow-lg truncate">${file.name}</h3>
+                            <p class="text-white/60 text-sm font-medium">${file.date}</p>
+                        </div>
+                        <div class="flex flex-col gap-6 pointer-events-auto">
+                            <button onclick="deleteFile('${file.id}'); closeViewer();" class="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:bg-rose-500 transition-all">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                            <a href="${file.url}" download class="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:bg-indigo-500 transition-all">
+                                <i class="fa-solid fa-download"></i>
+                            </a>
+                        </div>
+                    </div>
+                `;
+                scroller.appendChild(item);
+            });
+            
+            // Scroll to the selected file
+            const target = document.getElementById(`view-${selectedFile.id}`);
+            if (target) target.scrollIntoView();
+
+            // Auto-play if it's a video
+            const firstVideo = target.querySelector('video');
+            if (firstVideo) firstVideo.play();
+            
+            // Handle video play/pause on scroll
+            scroller.addEventListener('scroll', () => {
+                const items = scroller.querySelectorAll('.snap-item');
+                items.forEach(item => {
+                    const rect = item.getBoundingClientRect();
+                    const video = item.querySelector('video');
+                    if (video) {
+                        if (Math.abs(rect.top) < window.innerHeight / 2) {
+                            video.play();
+                        } else {
+                            video.pause();
+                        }
+                    }
+                });
+            });
+        }
+
+        function closeViewer() {
+            viewerModal.classList.add('hidden');
+            viewerModal.innerHTML = ''; // Clear the scroller
+        }
+
+        // Notes & Reminders
+        function renderNotes(save = true) {
+            notesList.innerHTML = '';
+            notes.forEach((note, index) => {
+                const div = document.createElement('div');
+                div.className = 'p-3 bg-white/50 dark:bg-slate-800/50 rounded-xl border border-gray-100 dark:border-slate-700 group shadow-sm transition-all hover:shadow-md';
+                div.innerHTML = `
+                    <div class="flex justify-between mb-1">
+                        <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tight">${note.date}</span>
+                        <button onclick="deleteNote(${index})" class="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-rose-500 transition-all"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <p class="text-sm dark:text-gray-200 break-words leading-relaxed">${note.text}</p>
+                `;
+                notesList.appendChild(div);
+            });
+            if (save) apiFetch('/notes', { method: 'POST', body: JSON.stringify(notes), headers: { 'Content-Type': 'application/json' } });
+        }
+
+        function addNote() {
+            const text = prompt("Enter your note:");
+            if (text) {
+                notes.unshift({ text, date: new Date().toLocaleDateString() });
+                renderNotes();
+            }
+        }
+
+        function deleteNote(index) {
+            notes.splice(index, 1);
+            renderNotes();
+        }
+
+        function renderReminders(save = true) {
+            remindersList.innerHTML = '';
+            reminders.forEach((rem, index) => {
+                const div = document.createElement('div');
+                div.className = 'flex items-center gap-3 p-2 hover:bg-white/30 dark:hover:bg-slate-800/30 rounded-lg group';
+                div.innerHTML = `
+                    <input type="checkbox" onchange="deleteReminder(${index})" class="w-4 h-4 rounded border-gray-300 dark:border-slate-700 text-indigo-600 focus:ring-indigo-500 bg-white dark:bg-slate-800">
+                    <span class="text-sm text-gray-700 dark:text-gray-300 flex-grow">${rem}</span>
+                `;
+                remindersList.appendChild(div);
+            });
+            if (save) apiFetch('/reminders', { method: 'POST', body: JSON.stringify(reminders), headers: { 'Content-Type': 'application/json' } });
+        }
+
+        function addReminder() {
+            const text = prompt("Reminder for:");
+            if (text) {
+                reminders.push(text);
+                renderReminders();
+            }
+        }
+
+        function deleteReminder(index) {
+            setTimeout(() => {
+                reminders.splice(index, 1);
+                renderReminders();
+            }, 300);
+        }
+
+        // Helpers
+        function getIconClass(type) {
+            const icons = { video: 'fa-file-video', audio: 'fa-file-audio', image: 'fa-file-image', document: 'fa-file-lines' };
+            return icons[type] || 'fa-file';
+        }
+
+        function getColorClass(type) {
+            const colors = {
+                video: { bg: 'bg-rose-100 dark:bg-rose-900/30', text: 'text-rose-600 dark:text-rose-400' },
+                audio: { bg: 'bg-violet-100 dark:bg-violet-900/30', text: 'text-violet-600 dark:text-violet-400' },
+                image: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-600 dark:text-emerald-400' },
+                document: { bg: 'bg-indigo-100 dark:bg-indigo-900/30', text: 'text-indigo-600 dark:text-indigo-400' }
+            };
+            return colors[type] || colors.document;
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024, dm = 1, sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+    </script>
+</body>
+</html>

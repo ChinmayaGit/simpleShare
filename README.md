@@ -4,6 +4,10 @@ A lightweight self-hosted file sharing website created to utilize the free **200
 Built as a simple personal web-based storage and sharing solution.
 
 🌐 Live Demo: http://cgarnaik.duckdns.org/  
+This user has only view access:
+USER: test@gmail.com
+PASS: 12345678
+
 📦 Repository: https://github.com/ChinmayaGit/simpleShare
 
 ---

@@ -1,1 +1,2 @@
-"# simpleShare" 
+# simpleShare
+http://cgarnaik.duckdns.org/

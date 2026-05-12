@@ -103,7 +103,7 @@
             <div class="glass rounded-2xl p-5 shadow-sm border border-indigo-100 dark:border-slate-800">
                 <div class="flex justify-between items-center mb-4">
                     <h3 class="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                        <i class="fa-solid fa-gauge-high text-indigo-500"></i> System Monitor
+                        <i class="fa-solid fa-gauge-high text-indigo-500"></i> Server Monitor
                     </h3>
                     <span class="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-[10px] text-emerald-600 font-bold">LIVE</span>
                 </div>
@@ -128,7 +128,7 @@
                     </div>
                     <div>
                         <div class="flex justify-between text-xs mb-1">
-                            <span class="text-gray-500">IndexedDB Storage</span>
+                            <span class="text-gray-500">Server Storage</span>
                             <span id="storage-val" class="font-bold text-amber-600">0 MB</span>
                         </div>
                         <div class="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-1.5">
@@ -140,12 +140,10 @@
 
             <!-- Categories -->
             <div class="glass rounded-2xl p-4 flex flex-col gap-1 shadow-sm">
-                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-3">Navigation</h3>
                 <button onclick="showLanding()" id="cat-home" class="category-btn w-full text-left px-4 py-2.5 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-medium transition-colors flex items-center gap-3">
                     <i class="fa-solid fa-house w-5"></i> Home
                 </button>
                 <div class="h-px bg-gray-100 dark:bg-slate-800 my-2 mx-3"></div>
-                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 px-3">Categories</h3>
                 <button onclick="filterCategory('video')" id="cat-video" class="category-btn w-full text-left px-4 py-2.5 rounded-xl hover:bg-indigo-50 dark:hover:bg-slate-800/50 text-gray-600 dark:text-gray-400 font-medium transition-colors flex items-center gap-3">
                     <i class="fa-solid fa-video w-5"></i> Videos
                 </button>
@@ -261,22 +259,19 @@
             </div>
 
             <!-- Upload Area -->
-            <div id="drop-zone" class="glass border-2 border-dashed border-gray-300 dark:border-slate-700 rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-50/30">
+            <div id="drop-zone" onclick="document.getElementById('file-input').click()" class="glass border-2 border-dashed border-gray-300 dark:border-slate-700 rounded-2xl p-8 flex flex-col items-center justify-center text-center transition-all cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-50/30">
                 <div class="w-14 h-14 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 rounded-full flex items-center justify-center text-xl mb-3 shadow-sm">
-                    <i class="fa-solid fa-plus"></i>
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
                 </div>
-                <h2 class="text-lg font-bold dark:text-white">Upload to Database</h2>
-                <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">Files are saved permanently in your browser</p>
+                <h2 class="text-lg font-bold dark:text-white">Upload to Cloud</h2>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Click anywhere here or drag and drop files</p>
                 <input type="file" id="file-input" class="hidden" multiple>
-                <button onclick="document.getElementById('file-input').click()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-all shadow-md shadow-indigo-200 dark:shadow-none">
-                    Choose Files
-                </button>
             </div>
 
             <!-- Upload Progress -->
             <div id="upload-progress-container" class="glass rounded-2xl p-4 hidden flex-col gap-3 shadow-sm border border-indigo-100 dark:border-slate-800">
                 <div class="flex justify-between items-center text-xs font-medium">
-                    <span id="upload-filename" class="text-gray-700 dark:text-gray-300 truncate max-w-[70%]">Saving to IndexedDB...</span>
+                    <span id="upload-filename" class="text-gray-700 dark:text-gray-300 truncate max-w-[70%]">Uploading...</span>
                     <span id="upload-percentage" class="text-indigo-600 font-bold">0%</span>
                 </div>
                 <div class="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
@@ -758,10 +753,16 @@
                             <p class="text-white/60 text-sm font-medium">${file.date}</p>
                         </div>
                         <div class="flex flex-col gap-6 pointer-events-auto">
-                            <button onclick="deleteFile('${file.id}'); closeViewer();" class="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:bg-rose-500 transition-all">
+                            <button onclick="toggleFullscreen(this.closest('.snap-item'))" class="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:bg-indigo-500 transition-all" title="Fullscreen">
+                                <i class="fa-solid fa-expand"></i>
+                            </button>
+                            <button onclick="rotateMedia(this.closest('.snap-item'))" class="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:bg-indigo-500 transition-all" title="Rotate">
+                                <i class="fa-solid fa-rotate"></i>
+                            </button>
+                            <button onclick="deleteFile('${file.id}'); closeViewer();" class="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:bg-rose-500 transition-all" title="Delete">
                                 <i class="fa-solid fa-trash"></i>
                             </button>
-                            <a href="${file.url}" download class="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:bg-indigo-500 transition-all">
+                            <a href="${file.url}" download class="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:bg-indigo-500 transition-all" title="Download">
                                 <i class="fa-solid fa-download"></i>
                             </a>
                         </div>
@@ -798,6 +799,39 @@
         function closeViewer() {
             viewerModal.classList.add('hidden');
             viewerModal.innerHTML = ''; // Clear the scroller
+        }
+
+        // Media Controls
+        function toggleFullscreen(elem) {
+            if (!document.fullscreenElement) {
+                elem.requestFullscreen().catch(err => {
+                    alert(`Error attempting to enable full-screen mode: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        function rotateMedia(container) {
+            const media = container.querySelector('img, video');
+            if (!media) return;
+            
+            let currentRotation = parseInt(media.dataset.rotation || '0');
+            currentRotation = (currentRotation + 90) % 360;
+            media.dataset.rotation = currentRotation;
+            
+            media.style.transform = `rotate(${currentRotation}deg)`;
+            
+            // Adjust scale to fit if rotated 90 or 270 degrees
+            if (currentRotation === 90 || currentRotation === 270) {
+                const ratio = window.innerHeight / window.innerWidth;
+                const scale = Math.min(1, ratio);
+                media.style.maxWidth = '100vh';
+                media.style.maxHeight = '100vw';
+            } else {
+                media.style.maxWidth = '100%';
+                media.style.maxHeight = '100%';
+            }
         }
 
         // Notes & Reminders

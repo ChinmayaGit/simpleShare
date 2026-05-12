@@ -56,6 +56,18 @@ app.get('/api', (req, res) => {
     res.json({ status: 'ok', message: 'simpleShare API is running' });
 });
 
+// Auth
+app.post('/api/login', (req, res) => {
+    const { email, password } = req.body;
+    if (email === 'chinu@gmail.com' && password === 'Drive@123') {
+        res.json({ success: true, token: 'fake-jwt-token-admin', role: 'admin' });
+    } else if (email === 'test@gmail.com' && password === '12345678') {
+        res.json({ success: true, token: 'fake-jwt-token-viewer', role: 'viewer' });
+    } else {
+        res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+});
+
 // Files
 app.get('/api/files', (req, res) => {
     res.json(data.files);

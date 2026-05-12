@@ -76,8 +76,46 @@
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-slate-900 dark:to-indigo-950 min-h-screen font-sans text-gray-800 dark:text-gray-200 transition-colors duration-300 pb-10">
     
-    <!-- Init Loader -->
-    <div id="init-loader">
+    <!-- Auth View -->
+    <div id="auth-view" class="fixed inset-0 z-[200] bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center p-4 transition-opacity duration-500">
+        <div class="glass w-full max-w-md p-8 rounded-3xl shadow-2xl flex flex-col items-center gap-6">
+            <div class="w-20 h-20 rounded-2xl bg-white/20 flex items-center justify-center text-4xl text-white shadow-lg">
+                <i class="fa-solid fa-share-nodes"></i>
+            </div>
+            <div class="text-center">
+                <h1 class="text-3xl font-bold text-white mb-2">Welcome Back</h1>
+                <p class="text-indigo-100/80 text-sm">Securely access your shared files</p>
+            </div>
+            
+            <form id="login-form" class="w-full flex flex-col gap-4">
+                <div class="relative">
+                    <i class="fa-solid fa-envelope absolute left-4 top-1/2 -translate-y-1/2 text-white/60"></i>
+                    <input type="email" id="login-email" placeholder="Email Address" required 
+                        class="w-full bg-white/10 border border-white/20 rounded-xl py-3 pl-12 pr-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all">
+                </div>
+                <div class="relative">
+                    <i class="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-white/60"></i>
+                    <input type="password" id="login-password" placeholder="Password" required 
+                        class="w-full bg-white/10 border border-white/20 rounded-xl py-3 pl-12 pr-4 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30 transition-all">
+                </div>
+                <button type="submit" 
+                    class="w-full bg-white text-indigo-600 font-bold py-3 rounded-xl shadow-lg hover:bg-indigo-50 active:scale-95 transition-all mt-2">
+                    Access My Drive
+                </button>
+                <p id="login-error" class="text-rose-200 text-xs text-center hidden font-medium">Invalid credentials. Please try again.</p>
+            </form>
+            
+            <div class="flex items-center gap-2 mt-4 text-white/40 text-[10px] uppercase tracking-widest font-bold">
+                <div class="h-px w-8 bg-white/20"></div>
+                simpleShare Security
+                <div class="h-px w-8 bg-white/20"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-app" class="hidden opacity-0 transition-opacity duration-500">
+        <!-- Init Loader -->
+        <div id="init-loader">
         <div class="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
         <p class="font-bold text-indigo-600 dark:text-indigo-400">Loading simpleShare...</p>
     </div>
@@ -142,19 +180,6 @@
             <div class="glass rounded-2xl p-4 flex flex-col gap-1 shadow-sm">
                 <button onclick="showLanding()" id="cat-home" class="category-btn w-full text-left px-4 py-2.5 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-medium transition-colors flex items-center gap-3">
                     <i class="fa-solid fa-house w-5"></i> Home
-                </button>
-                <div class="h-px bg-gray-100 dark:bg-slate-800 my-2 mx-3"></div>
-                <button onclick="filterCategory('video')" id="cat-video" class="category-btn w-full text-left px-4 py-2.5 rounded-xl hover:bg-indigo-50 dark:hover:bg-slate-800/50 text-gray-600 dark:text-gray-400 font-medium transition-colors flex items-center gap-3">
-                    <i class="fa-solid fa-video w-5"></i> Videos
-                </button>
-                <button onclick="filterCategory('audio')" id="cat-audio" class="category-btn w-full text-left px-4 py-2.5 rounded-xl hover:bg-indigo-50 dark:hover:bg-slate-800/50 text-gray-600 dark:text-gray-400 font-medium transition-colors flex items-center gap-3">
-                    <i class="fa-solid fa-music w-5"></i> Audio & Songs
-                </button>
-                <button onclick="filterCategory('image')" id="cat-image" class="category-btn w-full text-left px-4 py-2.5 rounded-xl hover:bg-indigo-50 dark:hover:bg-slate-800/50 text-gray-600 dark:text-gray-400 font-medium transition-colors flex items-center gap-3">
-                    <i class="fa-solid fa-image w-5"></i> Images
-                </button>
-                <button onclick="filterCategory('document')" id="cat-document" class="category-btn w-full text-left px-4 py-2.5 rounded-xl hover:bg-indigo-50 dark:hover:bg-slate-800/50 text-gray-600 dark:text-gray-400 font-medium transition-colors flex items-center gap-3">
-                    <i class="fa-solid fa-file-lines w-5"></i> Documents
                 </button>
             </div>
         </aside>
@@ -319,11 +344,120 @@
         </div>
     </div>
 
+    </div> <!-- End Main App -->
+
     <script>
+        /**
+         * AUTHENTICATION LOGIC
+         */
+        const authView = document.getElementById('auth-view');
+        const mainApp = document.getElementById('main-app');
+        const loginForm = document.getElementById('login-form');
+        const loginError = document.getElementById('login-error');
+
+        function checkAuth() {
+            const isAuth = localStorage.getItem('simpleShare_authenticated') === 'true';
+            if (isAuth) {
+                showApp();
+            } else {
+                authView.classList.remove('hidden');
+                authView.classList.add('flex');
+            }
+        }
+
+        function showApp() {
+            authView.style.opacity = '0';
+            setTimeout(() => {
+                authView.classList.add('hidden');
+                authView.classList.remove('flex');
+                mainApp.classList.remove('hidden');
+                setTimeout(() => mainApp.style.opacity = '1', 50);
+                applyRoleRestrictions();
+                initAppData();
+            }, 500);
+        }
+
+        function applyRoleRestrictions() {
+            const role = localStorage.getItem('simpleShare_role');
+            if (role === 'viewer') {
+                document.getElementById('drop-zone').classList.add('hidden');
+                document.querySelectorAll('button[onclick="addNote()"], button[onclick="addReminder()"]').forEach(b => b.classList.add('hidden'));
+                const style = document.createElement('style');
+                style.id = 'viewer-style';
+                style.innerHTML = `
+                    button[onclick*="deleteFile"], 
+                    button[onclick*="deleteNote"], 
+                    input[onchange*="deleteReminder"] { 
+                        display: none !important; 
+                    }
+                `;
+                document.head.appendChild(style);
+            } else {
+                const style = document.getElementById('viewer-style');
+                if (style) style.remove();
+            }
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    localStorage.setItem('simpleShare_authenticated', 'true');
+                    localStorage.setItem('simpleShare_role', result.role);
+                    showApp();
+                } else {
+                    loginError.classList.remove('hidden');
+                }
+            } catch (err) {
+                alert("Connection error. Please try again.");
+            }
+        });
+
+        async function initAppData() {
+            try {
+                // Fetch initial data from server
+                [files, notes, reminders] = await Promise.all([
+                    apiFetch('/files'),
+                    apiFetch('/notes'),
+                    apiFetch('/reminders')
+                ]);
+
+                updateCategoryCounts();
+                renderRecentFiles();
+                renderNotes(false);
+                renderReminders(false);
+                
+                // Hide loader
+                const loader = document.getElementById('init-loader');
+                if (loader) {
+                    loader.style.opacity = '0';
+                    setTimeout(() => loader.remove(), 500);
+                }
+            } catch (err) {
+                console.error("Failed to fetch initial data", err);
+                const loader = document.getElementById('init-loader');
+                if (loader) {
+                    loader.style.opacity = '0';
+                    setTimeout(() => loader.remove(), 500);
+                }
+                alert("Could not connect to the server.");
+            }
+        }
+
         /**
          * BACKEND INTEGRATION LOGIC
          */
-        const API_BASE = '/api'; // Behind Nginx reverse proxy
+        const API_BASE = '/api';
 
         async function apiFetch(endpoint, options = {}) {
             try {
@@ -391,7 +525,6 @@
         const viewerModal = document.getElementById('viewer-modal');
         const viewerContent = document.getElementById('viewer-content');
         const viewerFooter = document.getElementById('viewer-footer');
-        const loader = document.getElementById('init-loader');
         
         const landingView = document.getElementById('landing-view');
         const categoryView = document.getElementById('category-view');
@@ -407,32 +540,10 @@
             localStorage.theme = isDark ? 'dark' : 'light';
             themeIcon.classList.replace(isDark ? 'fa-moon' : 'fa-sun', isDark ? 'fa-sun' : 'fa-moon');
         });
+        
+        // Replace the existing window load event
+        window.addEventListener('load', checkAuth);
 
-        // Startup
-        window.addEventListener('load', async () => {
-            try {
-                // Fetch initial data from server
-                [files, notes, reminders] = await Promise.all([
-                    apiFetch('/files'),
-                    apiFetch('/notes'),
-                    apiFetch('/reminders')
-                ]);
-
-                updateCategoryCounts();
-                renderRecentFiles();
-                renderNotes(false);
-                renderReminders(false);
-                
-                // Hide loader
-                loader.style.opacity = '0';
-                setTimeout(() => loader.remove(), 500);
-            } catch (err) {
-                console.error("Failed to fetch initial data", err);
-                loader.style.opacity = '0';
-                setTimeout(() => loader.remove(), 500);
-                alert("Could not connect to the server.");
-            }
-        });
 
         // Navigation
         function showLanding() {

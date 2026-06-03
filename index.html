@@ -963,7 +963,7 @@
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                     ${shareUrl ? `
-                    <div class="fixed top-0 left-[20%] right-[20%] z-[80] bg-black/60 backdrop-blur-md py-3 flex items-center justify-center gap-3 rounded-b-xl">
+                    <div class="fixed top-0 left-[20%] right-[20%] z-[80] bg-black/60 backdrop-blur-md px-5 py-4 flex items-center justify-center gap-3 rounded-b-xl">
                         <i class="fa-solid fa-link text-indigo-400 shrink-0"></i>
                         <input type="text" readonly value="${shareUrl}" onclick="this.select()" class="flex-grow min-w-0 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-white text-xs truncate focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         <button onclick="copyShareLink('${selectedFile.id}')" class="shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-1.5 rounded-lg transition-all">
@@ -972,7 +972,7 @@
                     </div>
                     ` : ''}
                     
-                    <div id="immersive-scroller" class="snap-container h-screen w-full${shareUrl ? ' pt-14' : ''}">
+                    <div id="immersive-scroller" class="snap-container h-screen w-full${shareUrl ? ' pt-16' : ''}">
                         <!-- Media items will be injected here -->
                     </div>
                 </div>

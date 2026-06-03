@@ -104,6 +104,11 @@
                 </button>
                 <p id="login-error" class="text-rose-200 text-xs text-center hidden font-medium">Invalid credentials. Please try again.</p>
             </form>
+
+            <button type="button" onclick="enterViewMode()"
+                class="w-full border-2 border-white/30 text-white font-bold py-3 rounded-xl hover:bg-white/10 active:scale-95 transition-all flex items-center justify-center gap-2">
+                <i class="fa-solid fa-eye"></i> View Mode — No Login Required
+            </button>
             
             <div class="flex items-center gap-2 mt-4 text-white/40 text-[10px] uppercase tracking-widest font-bold">
                 <div class="h-px w-8 bg-white/20"></div>
@@ -407,6 +412,10 @@
             location.reload();
         }
 
+        function enterViewMode() {
+            window.location.href = `${window.location.pathname}?view`;
+        }
+
         function showApp() {
             authView.style.opacity = '0';
             setTimeout(() => {
@@ -513,14 +522,38 @@
             }
         }
 
-        function copyShareLink(fileId, event) {
+        async function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch (e) {}
+            }
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.cssText = 'position:fixed;left:-9999px;top:0';
+            document.body.appendChild(textarea);
+            textarea.focus();
+            textarea.select();
+            try {
+                const ok = document.execCommand('copy');
+                document.body.removeChild(textarea);
+                return ok;
+            } catch (e) {
+                document.body.removeChild(textarea);
+                return false;
+            }
+        }
+
+        async function copyShareLink(fileId, event) {
             if (event) event.stopPropagation();
             const url = getShareUrl(fileId);
-            navigator.clipboard.writeText(url).then(() => {
+            const copied = await copyToClipboard(url);
+            if (copied) {
                 showToast('Share link copied!');
-            }).catch(() => {
+            } else {
                 prompt('Copy this share link:', url);
-            });
+            }
         }
 
         function showToast(message) {

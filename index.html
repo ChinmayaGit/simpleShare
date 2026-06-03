@@ -105,6 +105,12 @@
                 <p id="login-error" class="text-rose-200 text-xs text-center hidden font-medium">Invalid credentials. Please try again.</p>
             </form>
 
+            <div class="flex items-center gap-3 w-full text-white/50 text-xs font-bold uppercase tracking-widest">
+                <div class="h-px flex-grow bg-white/20"></div>
+                or
+                <div class="h-px flex-grow bg-white/20"></div>
+            </div>
+
             <button type="button" onclick="enterViewMode()"
                 class="w-full border-2 border-white/30 text-white font-bold py-3 rounded-xl hover:bg-white/10 active:scale-95 transition-all flex items-center justify-center gap-2">
                 <i class="fa-solid fa-eye"></i> View Mode — No Login Required
@@ -365,10 +371,20 @@
         const mainApp = document.getElementById('main-app');
         const loginForm = document.getElementById('login-form');
         const loginError = document.getElementById('login-error');
-        const urlParams = new URLSearchParams(window.location.search);
-        const shareFileId = urlParams.get('share');
-        const isGuestViewMode = urlParams.has('view') || urlParams.get('mode') === 'view' || !!shareFileId;
         const SHAREABLE_TYPES = ['video', 'audio', 'image'];
+
+        function getUrlParams() {
+            return new URLSearchParams(window.location.search);
+        }
+
+        function inGuestViewMode() {
+            const params = getUrlParams();
+            return params.has('view') || params.get('mode') === 'view' || !!params.get('share');
+        }
+
+        function getShareFileId() {
+            return getUrlParams().get('share');
+        }
 
         function isShareable(file) {
             return file && SHAREABLE_TYPES.includes(file.type);
@@ -379,13 +395,19 @@
             return `${base}?share=${fileId}`;
         }
 
+        function startGuestView() {
+            authView.classList.add('hidden');
+            authView.classList.remove('flex');
+            mainApp.classList.remove('hidden');
+            mainApp.style.opacity = '1';
+            applyRoleRestrictions(true);
+            applyGuestViewUI();
+            initAppData();
+        }
+
         function checkAuth() {
-            if (isGuestViewMode) {
-                mainApp.classList.remove('hidden');
-                mainApp.style.opacity = '1';
-                applyRoleRestrictions(true);
-                applyGuestViewUI();
-                initAppData();
+            if (inGuestViewMode()) {
+                startGuestView();
                 return;
             }
 
@@ -413,7 +435,8 @@
         }
 
         function enterViewMode() {
-            window.location.href = `${window.location.pathname}?view`;
+            window.history.replaceState({}, '', `${window.location.pathname}?view`);
+            startGuestView();
         }
 
         function showApp() {
@@ -481,6 +504,7 @@
         });
 
         async function initAppData() {
+            const shareFileId = getShareFileId();
             try {
                 if (shareFileId) {
                     const sharedFile = await apiFetch(`/share/${shareFileId}`);
@@ -938,7 +962,7 @@
                     <button onclick="closeViewer()" class="fixed top-6 right-6 z-[80] text-white/50 hover:text-white text-4xl transition-all hover:scale-110">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
-                    ${shareUrl && (fromShareLink || isGuestViewMode) ? `
+                    ${shareUrl && (fromShareLink || inGuestViewMode()) ? `
                     <div class="fixed top-0 left-0 right-0 z-[80] bg-black/60 backdrop-blur-md px-4 py-3 flex items-center gap-3">
                         <i class="fa-solid fa-link text-indigo-400"></i>
                         <input type="text" readonly value="${shareUrl}" onclick="this.select()" class="flex-grow bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-white text-xs truncate focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -948,7 +972,7 @@
                     </div>
                     ` : ''}
                     
-                    <div id="immersive-scroller" class="snap-container h-screen w-full${shareUrl && (fromShareLink || isGuestViewMode) ? ' pt-14' : ''}">
+                    <div id="immersive-scroller" class="snap-container h-screen w-full${shareUrl && (fromShareLink || inGuestViewMode()) ? ' pt-14' : ''}">
                         <!-- Media items will be injected here -->
                     </div>
                 </div>

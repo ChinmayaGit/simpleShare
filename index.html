@@ -127,7 +127,10 @@
             Simple Share
         </div>
         <div class="flex items-center gap-4">
-            <button onclick="logout()" class="text-xs font-bold text-gray-500 hover:text-rose-500 transition-colors flex items-center gap-1">
+            <button id="nav-login-btn" onclick="showLogin()" class="hidden text-xs font-bold text-indigo-600 hover:text-indigo-500 transition-colors flex items-center gap-1">
+                <i class="fa-solid fa-right-to-bracket"></i> Sign In
+            </button>
+            <button id="nav-logout-btn" onclick="logout()" class="text-xs font-bold text-gray-500 hover:text-rose-500 transition-colors flex items-center gap-1">
                 <i class="fa-solid fa-right-from-bracket"></i> Logout
             </button>
             <button id="theme-toggle" class="w-10 h-10 rounded-full flex items-center justify-center bg-white dark:bg-slate-800 shadow-sm border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-yellow-400 hover:scale-110 transition-all">
@@ -351,25 +354,57 @@
 
     <script>
         /**
-         * AUTHENTICATION LOGIC
+         * AUTHENTICATION & VIEW MODE LOGIC
          */
         const authView = document.getElementById('auth-view');
         const mainApp = document.getElementById('main-app');
         const loginForm = document.getElementById('login-form');
         const loginError = document.getElementById('login-error');
+        const urlParams = new URLSearchParams(window.location.search);
+        const shareFileId = urlParams.get('share');
+        const isGuestViewMode = urlParams.has('view') || urlParams.get('mode') === 'view' || !!shareFileId;
+        const SHAREABLE_TYPES = ['video', 'audio', 'image'];
+
+        function isShareable(file) {
+            return file && SHAREABLE_TYPES.includes(file.type);
+        }
+
+        function getShareUrl(fileId) {
+            const base = `${window.location.origin}${window.location.pathname}`;
+            return `${base}?share=${fileId}`;
+        }
 
         function checkAuth() {
-            const isAuth = localStorage.getItem('simpleShare_authenticated') === 'true';
-            if (isAuth) {
-                // Instantly show app for autologin
+            if (isGuestViewMode) {
                 mainApp.classList.remove('hidden');
                 mainApp.style.opacity = '1';
-                applyRoleRestrictions();
+                applyRoleRestrictions(true);
+                applyGuestViewUI();
+                initAppData();
+                return;
+            }
+
+            const isAuth = localStorage.getItem('simpleShare_authenticated') === 'true';
+            if (isAuth) {
+                mainApp.classList.remove('hidden');
+                mainApp.style.opacity = '1';
+                applyRoleRestrictions(false);
                 initAppData();
             } else {
                 authView.classList.remove('hidden');
                 authView.classList.add('flex');
             }
+        }
+
+        function applyGuestViewUI() {
+            document.getElementById('nav-logout-btn').classList.add('hidden');
+            document.getElementById('nav-login-btn').classList.remove('hidden');
+        }
+
+        function showLogin() {
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, '', cleanUrl);
+            location.reload();
         }
 
         function showApp() {
@@ -379,7 +414,7 @@
                 authView.classList.remove('flex');
                 mainApp.classList.remove('hidden');
                 setTimeout(() => mainApp.style.opacity = '1', 50);
-                applyRoleRestrictions();
+                applyRoleRestrictions(false);
                 initAppData();
             }, 500);
         }
@@ -390,9 +425,9 @@
             location.reload();
         }
 
-        function applyRoleRestrictions() {
-            const role = localStorage.getItem('simpleShare_role');
-            if (role === 'viewer') {
+        function applyRoleRestrictions(guest = false) {
+            const role = guest ? 'viewer' : localStorage.getItem('simpleShare_role');
+            if (role === 'viewer' || guest) {
                 document.getElementById('drop-zone').classList.add('hidden');
                 document.querySelectorAll('button[onclick="addNote()"], button[onclick="addReminder()"]').forEach(b => b.classList.add('hidden'));
                 const style = document.createElement('style');
@@ -404,7 +439,7 @@
                         display: none !important; 
                     }
                 `;
-                document.head.appendChild(style);
+                if (!document.getElementById('viewer-style')) document.head.appendChild(style);
             } else {
                 const style = document.getElementById('viewer-style');
                 if (style) style.remove();
@@ -438,19 +473,26 @@
 
         async function initAppData() {
             try {
-                // Fetch initial data from server
-                [files, notes, reminders] = await Promise.all([
-                    apiFetch('/files'),
-                    apiFetch('/notes'),
-                    apiFetch('/reminders')
-                ]);
-
-                updateCategoryCounts();
-                renderRecentFiles();
-                renderNotes(false);
-                renderReminders(false);
+                if (shareFileId) {
+                    const sharedFile = await apiFetch(`/share/${shareFileId}`);
+                    files = [sharedFile];
+                    notes = [];
+                    reminders = [];
+                    updateCategoryCounts();
+                    filterCategory(sharedFile.type);
+                    setTimeout(() => openViewer(sharedFile, true), 300);
+                } else {
+                    [files, notes, reminders] = await Promise.all([
+                        apiFetch('/files'),
+                        apiFetch('/notes'),
+                        apiFetch('/reminders')
+                    ]);
+                    updateCategoryCounts();
+                    renderRecentFiles();
+                    renderNotes(false);
+                    renderReminders(false);
+                }
                 
-                // Hide loader
                 const loader = document.getElementById('init-loader');
                 if (loader) {
                     loader.style.opacity = '0';
@@ -463,8 +505,42 @@
                     loader.style.opacity = '0';
                     setTimeout(() => loader.remove(), 500);
                 }
-                alert("Could not connect to the server.");
+                if (shareFileId) {
+                    alert("This shared link is invalid or has expired.");
+                } else {
+                    alert("Could not connect to the server.");
+                }
             }
+        }
+
+        function copyShareLink(fileId, event) {
+            if (event) event.stopPropagation();
+            const url = getShareUrl(fileId);
+            navigator.clipboard.writeText(url).then(() => {
+                showToast('Share link copied!');
+            }).catch(() => {
+                prompt('Copy this share link:', url);
+            });
+        }
+
+        function showToast(message) {
+            let toast = document.getElementById('share-toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'share-toast';
+                toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 z-[300] bg-indigo-600 text-white px-5 py-2.5 rounded-full text-sm font-bold shadow-lg transition-opacity duration-300';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = message;
+            toast.style.opacity = '1';
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(() => { toast.style.opacity = '0'; }, 2500);
+        }
+
+        function shareButtonHtml(fileId, extraClass = '') {
+            return `<button onclick="copyShareLink('${fileId}', event)" class="${extraClass} p-2 text-gray-400 hover:text-indigo-500 transition-all rounded-full hover:bg-indigo-50 dark:hover:bg-indigo-900/20" title="Copy share link">
+                <i class="fa-solid fa-share-nodes text-xs"></i>
+            </button>`;
         }
 
         /**
@@ -627,7 +703,9 @@
                         <h4 class="text-xs font-bold truncate dark:text-gray-100">${file.name}</h4>
                         <p class="text-[10px] text-gray-500">${file.size} • ${file.date}</p>
                     </div>
+                    ${isShareable(file) ? shareButtonHtml(file.id, 'opacity-0 group-hover:opacity-100') : ''}
                 `;
+                item.classList.add('group');
                 list.appendChild(item);
             });
         }
@@ -775,9 +853,12 @@
                             <h4 class="text-sm font-bold truncate dark:text-gray-100" title="${file.name}">${file.name}</h4>
                             <p class="text-[10px] text-gray-500 font-medium">${file.size} • ${file.date}</p>
                         </div>
-                        <button onclick="event.stopPropagation(); deleteFile('${file.id}')" class="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-rose-500 transition-all rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/20">
-                            <i class="fa-solid fa-trash-can text-xs"></i>
-                        </button>
+                        <div class="flex items-center gap-1">
+                            ${isShareable(file) ? shareButtonHtml(file.id, 'opacity-0 group-hover:opacity-100') : ''}
+                            <button onclick="event.stopPropagation(); deleteFile('${file.id}')" class="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-rose-500 transition-all rounded-full hover:bg-rose-50 dark:hover:bg-rose-900/20">
+                                <i class="fa-solid fa-trash-can text-xs"></i>
+                            </button>
+                        </div>
                     `;
                 } else {
                     card.className = 'glass rounded-lg p-2 px-4 flex items-center gap-4 group hover:bg-white/60 dark:hover:bg-slate-800/60 transition-all cursor-pointer';
@@ -789,6 +870,7 @@
                         <h4 class="text-sm font-medium truncate flex-grow dark:text-gray-200">${file.name}</h4>
                         <span class="text-[10px] text-gray-400 font-medium w-24 text-right">${file.date}</span>
                         <span class="text-[10px] text-gray-400 font-medium w-16 text-right">${file.size}</span>
+                        ${isShareable(file) ? shareButtonHtml(file.id, 'opacity-0 group-hover:opacity-100') : ''}
                         <button onclick="event.stopPropagation(); deleteFile('${file.id}')" class="opacity-0 group-hover:opacity-100 p-2 text-gray-400 hover:text-rose-500 transition-all ml-2">
                             <i class="fa-solid fa-trash-can text-xs"></i>
                         </button>
@@ -816,14 +898,24 @@
         }
 
         // Immersive Viewer Logic
-        function openViewer(selectedFile) {
+        function openViewer(selectedFile, fromShareLink = false) {
+            const shareUrl = isShareable(selectedFile) ? getShareUrl(selectedFile.id) : '';
             viewerModal.innerHTML = `
                 <div class="fixed inset-0 z-[70] bg-black/95 overflow-hidden">
                     <button onclick="closeViewer()" class="fixed top-6 right-6 z-[80] text-white/50 hover:text-white text-4xl transition-all hover:scale-110">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
+                    ${shareUrl && (fromShareLink || isGuestViewMode) ? `
+                    <div class="fixed top-0 left-0 right-0 z-[80] bg-black/60 backdrop-blur-md px-4 py-3 flex items-center gap-3">
+                        <i class="fa-solid fa-link text-indigo-400"></i>
+                        <input type="text" readonly value="${shareUrl}" onclick="this.select()" class="flex-grow bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-white text-xs truncate focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <button onclick="copyShareLink('${selectedFile.id}')" class="shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-1.5 rounded-lg transition-all">
+                            Copy Link
+                        </button>
+                    </div>
+                    ` : ''}
                     
-                    <div id="immersive-scroller" class="snap-container h-screen w-full">
+                    <div id="immersive-scroller" class="snap-container h-screen w-full${shareUrl && (fromShareLink || isGuestViewMode) ? ' pt-14' : ''}">
                         <!-- Media items will be injected here -->
                     </div>
                 </div>
@@ -877,6 +969,11 @@
                             <p class="text-white/60 text-sm font-medium">${file.date}</p>
                         </div>
                         <div class="flex flex-col gap-6 pointer-events-auto">
+                            ${isShareable(file) ? `
+                            <button onclick="copyShareLink('${file.id}')" class="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:bg-indigo-500 transition-all" title="Copy share link">
+                                <i class="fa-solid fa-share-nodes"></i>
+                            </button>
+                            ` : ''}
                             <button onclick="toggleFullscreen(this.closest('.snap-item'))" class="w-12 h-12 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center text-white hover:bg-indigo-500 transition-all" title="Fullscreen">
                                 <i class="fa-solid fa-expand"></i>
                             </button>

@@ -102,6 +102,16 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
     res.json(fileInfo);
 });
 
+const SHAREABLE_TYPES = ['video', 'audio', 'image'];
+
+app.get('/api/share/:id', (req, res) => {
+    const file = data.files.find(f => f.id === req.params.id);
+    if (!file || !SHAREABLE_TYPES.includes(file.type)) {
+        return res.status(404).json({ error: 'Shared file not found' });
+    }
+    res.json(file);
+});
+
 app.delete('/api/delete/:id', (req, res) => {
     const fileIndex = data.files.findIndex(f => f.id === req.params.id);
     if (fileIndex > -1) {
